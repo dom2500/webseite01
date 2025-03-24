@@ -1,98 +1,106 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let level = 1;
-let score = 0;
+const bg = new Image();
+bg.src = "assets/bg_level1.png";
 
-// Load Images
-const bg1 = new Image();
-bg1.src = "assets/bg_level1.png";
-
-const bg2 = new Image();
-bg2.src = "assets/bg_level2.png";
-
-const chickenImg = new Image();
-chickenImg.src = "assets/chicken.png";
+const playerImg = new Image();
+playerImg.src = "assets/chicken.png";
 
 const duckImg = new Image();
-duckImg.src = "assets/duck.png";
+duckImg.src = "assets/duck2.png";
 
 const leafImg = new Image();
 leafImg.src = "assets/leaf.png";
 
-// Player setup
-let player = {
+const keys = {};
+document.addEventListener("keydown", (e) => keys[e.code] = true);
+document.addEventListener("keyup", (e) => keys[e.code] = false);
+
+let score = 0;
+let gameOver = false;
+
+const player = {
   x: 50,
   y: 300,
   width: 50,
   height: 50,
+  velX: 0,
   velY: 0,
   jumping: false
 };
 
-const gravity = 0.5;
-const jumpPower = -10;
-const groundLevel = 350;
+const gravity = 0.6;
+const jumpPower = -12;
+const groundY = 350;
 
-let keys = {};
-let enemies = [];
-let items = [];
+const enemies = [
+  { x: 600, y: 310, width: 40, dir: -1 }
+];
 
-document.addEventListener("keydown", (e) => keys[e.code] = true);
-document.addEventListener("keyup", (e) => keys[e.code] = false);
+const items = [
+  { x: 300, y: 320, collected: false },
+  { x: 700, y: 320, collected: false }
+];
 
-function initLevel(levelNum) {
-  player.x = 50;
-  player.y = 300;
-  enemies = [];
-  items = [];
-
-  if (levelNum === 1) {
-    enemies.push({ x: 400, y: 310, width: 40, dir: 1 });
-    items.push({ x: 600, y: 320, collected: false });
-  } else if (levelNum === 2) {
-    enemies.push({ x: 300, y: 310, width: 40, dir: 1 });
-    enemies.push({ x: 600, y: 310, width: 40, dir: -1 });
-    items.push({ x: 500, y: 320, collected: false });
-    items.push({ x: 700, y: 320, collected: false });
-  }
-}
+const obstacles = [
+  { x: 200, y: 300, width: 100, height: 20 },
+  { x: 500, y: 250, width: 100, height: 20 }
+];
 
 function update() {
-  // Movement
-  if ((keys["ArrowUp"] || keys["Space"] || keys["KeyW"]) && !player.jumping) {
+  if (gameOver) return;
+
+  if ((keys["ArrowUp"] || keys["Space"]) && !player.jumping) {
     player.velY = jumpPower;
     player.jumping = true;
   }
 
-  if (keys["ArrowRight"] || keys["KeyD"]) player.x += 5;
-  if (keys["ArrowLeft"] || keys["KeyA"]) player.x -= 5;
+  if (keys["ArrowRight"]) player.velX = 4;
+  else if (keys["ArrowLeft"]) player.velX = -4;
+  else player.velX = 0;
 
+  player.x += player.velX;
   player.velY += gravity;
   player.y += player.velY;
 
-  if (player.y >= groundLevel - player.height) {
-    player.y = groundLevel - player.height;
+  if (player.y >= groundY - player.height) {
+    player.y = groundY - player.height;
     player.velY = 0;
     player.jumping = false;
   }
 
-  // Update enemies
-  enemies.forEach(e => {
-    e.x += e.dir * 2;
-    if (e.x < 100 || e.x > 700) e.dir *= -1;
-
-    // Collision
-    if (player.x < e.x + e.width &&
-        player.x + player.width > e.x &&
-        player.y < e.y + e.width &&
-        player.y + player.height > e.y) {
-      alert("Von einer Ente erwischt! Spiel endet.");
-      document.location.reload();
+  // Collision with obstacles
+  obstacles.forEach(o => {
+    if (
+      player.x + player.width > o.x &&
+      player.x < o.x + o.width &&
+      player.y + player.height >= o.y &&
+      player.y + player.height <= o.y + o.height &&
+      player.velY >= 0
+    ) {
+      player.y = o.y - player.height;
+      player.velY = 0;
+      player.jumping = false;
     }
   });
 
-  // Items
+  // Enemies movement & collision
+  enemies.forEach(e => {
+    e.x += e.dir * 2;
+    if (e.x < 100 || e.x > 750) e.dir *= -1;
+
+    if (
+      player.x < e.x + e.width &&
+      player.x + player.width > e.x &&
+      player.y < e.y + e.width &&
+      player.y + player.height > e.y
+    ) {
+      gameOver = true;
+    }
+  });
+
+  // Item collection
   items.forEach(i => {
     if (!i.collected &&
         player.x < i.x + 30 &&
@@ -103,53 +111,51 @@ function update() {
       score += 10;
     }
   });
-
-  // Level switch
-  if (player.x > 800) {
-    if (level === 1) {
-      level = 2;
-      initLevel(2);
-    } else {
-      alert("Du hast alle Level gemeistert! 🏆 Punkte: " + score);
-      document.location.reload();
-    }
-  }
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(level === 1 ? bg1 : bg2, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
 
-  // Draw player
-  ctx.drawImage(chickenImg, player.x, player.y, player.width, player.height);
-
-  // Draw enemies
-  enemies.forEach(e => {
-    ctx.drawImage(duckImg, e.x, e.y, e.width, e.width);
+  // Obstacles
+  ctx.fillStyle = "#654321";
+  obstacles.forEach(o => {
+    ctx.fillRect(o.x, o.y, o.width, o.height);
   });
 
-  // Draw items
+  // Items
   items.forEach(i => {
     if (!i.collected) {
       ctx.drawImage(leafImg, i.x, i.y, 30, 30);
     }
   });
 
-  // HUD
+  // Enemies
+  enemies.forEach(e => {
+    ctx.drawImage(duckImg, e.x, e.y, e.width, e.width);
+  });
+
+  // Player
+  ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+
+  // UI
   ctx.fillStyle = "white";
   ctx.font = "20px sans-serif";
-  ctx.fillText("Level: " + level, 10, 30);
-  ctx.fillText("Score: " + score, 700, 30);
+  ctx.fillText("Punkte: " + score, 10, 30);
+
+  if (gameOver) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "red";
+    ctx.font = "40px sans-serif";
+    ctx.fillText("GAME OVER", 280, 200);
+  }
 }
 
-function gameLoop() {
+function loop() {
   update();
   draw();
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
 
-// Start game
-chickenImg.onload = () => {
-  initLevel(1);
-  gameLoop();
-};
+bg.onload = () => loop();
